@@ -24,6 +24,9 @@ public class Home extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_home);
 
+        ActionBar actionBar=getSupportActionBar();
+        actionBar.setTitle("Rona News");
+
         firebaseAuth=FirebaseAuth.getInstance();
 
 
@@ -45,6 +48,11 @@ public class Home extends AppCompatActivity {
                 logOut();
 
                 return  true;
+
+            case R.id.Account_settings:
+                Intent intent = new Intent(this,SetupAvtivity.class);
+                startActivity(intent);
+
 
                 default:
                     return false;

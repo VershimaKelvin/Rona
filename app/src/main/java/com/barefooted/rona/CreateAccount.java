@@ -93,7 +93,7 @@ public class CreateAccount extends AppCompatActivity {
             public void onComplete(@NonNull Task<AuthResult> task) {
 
                 if(task.isSuccessful()){
-                    Intent intent = new Intent(CreateAccount.this, Home.class);
+                    Intent intent = new Intent(CreateAccount.this, SetupAvtivity.class);
                     startActivity(intent);
                     finish();
                 }else{
