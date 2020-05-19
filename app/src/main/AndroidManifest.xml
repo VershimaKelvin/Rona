@@ -15,6 +15,8 @@
         <activity android:name=".CreateAccount" />
         <activity android:name=".Home" />
         <activity android:name=".Login" />
+        <activity android:name="com.theartofdev.edmodo.cropper.CropImageActivity"
+            android:theme="@style/Base.Theme.AppCompat"/>
 
         <activity android:name=".MainActivity">
             <intent-filter>
