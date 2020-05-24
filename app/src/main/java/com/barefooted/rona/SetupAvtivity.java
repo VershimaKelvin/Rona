@@ -21,84 +21,75 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
+import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.RequestOptions;
+import com.google.android.gms.tasks.Continuation;
 import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnFailureListener;
+import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 import com.theartofdev.edmodo.cropper.CropImage;
 import com.theartofdev.edmodo.cropper.CropImageView;
 
+import org.w3c.dom.Text;
+
+import java.net.URL;
+import java.util.HashMap;
+import java.util.Map;
+
 import de.hdodenhof.circleimageview.CircleImageView;
 
 public class SetupAvtivity extends AppCompatActivity {
 
+    Uri downloadUri=null;
+    String UserName;
+    String user_id;
     CircleImageView circleImageView;
     Uri mainImageUri = null;
-    EditText name;
-    Button setup;
+    EditText EditTextForName;
+    Button setupButton;
+    Boolean isChanged=false;
     ProgressBar progressbar;
     FirebaseAuth firebaseAuth;
     FirebaseStorage firebaseStorage;
+    FirebaseFirestore firebaseFirestore;
     StorageReference storageReference;
+    String collectionName = "Users";
+    String nameKey = "name";
+    String imageKey = "image";
+    private String photoLink;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_setup_avtivity);
 
-        circleImageView = findViewById(R.id.imageView);
-        name= findViewById(R.id.editText);
-        setup=findViewById(R.id.setup_Button);
-        progressbar = findViewById(R.id.progress);
-
-        firebaseStorage = FirebaseStorage.getInstance();
-        firebaseAuth = FirebaseAuth.getInstance();
-        storageReference= firebaseStorage.getReference();
-
-
-
-        setup.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                String names =  name.getText().toString().trim();
-
-                if(!TextUtils.isEmpty(names) && mainImageUri !=null){
-                    String user_id = firebaseAuth.getCurrentUser().getUid();
-
-                    progressbar.setVisibility(View.VISIBLE);
-                    StorageReference image_path = storageReference.child("profile_images");
-                    final StorageReference path =image_path.child(user_id + ".jpg");
-
-                   UploadTask uploadTask = path.putFile(mainImageUri);
-
-
-
-                   uploadTask.addOnCompleteListener(new OnCompleteListener<UploadTask.TaskSnapshot>() {
-                        @Override
-                        public void onComplete(@NonNull Task<UploadTask.TaskSnapshot> task) {
-
-                            if(task.isSuccessful()){
-                                 Uri download_uri = task.getResult().getUploadSessionUri();
-                                Toast.makeText(SetupAvtivity.this, "picture uploaded", Toast.LENGTH_SHORT).show();
-
-                            }else{
-                                String error= task.getException().toString();
-                                Toast.makeText(SetupAvtivity.this, error, Toast.LENGTH_SHORT).show();
-                            }
-                            progressbar.setVisibility(View.INVISIBLE);
-                        }
-                    });
-
-                }else{
-                    Toast.makeText(SetupAvtivity.this, "You have to enter a Name and pick an image", Toast.LENGTH_LONG).show();
-                }
-            }
-        });
 
         ActionBar actionbar = getSupportActionBar();
         actionbar.setTitle("Account Setup");
 
+        circleImageView = findViewById(R.id.imageView);
+        EditTextForName= findViewById(R.id.editText);
+        setupButton=findViewById(R.id.setup_Button);
+        progressbar = findViewById(R.id.progress);
+
+        firebaseFirestore=FirebaseFirestore.getInstance();
+        firebaseStorage = FirebaseStorage.getInstance();
+        firebaseAuth = FirebaseAuth.getInstance();
+        storageReference= firebaseStorage.getReference();
+
+        user_id = firebaseAuth.getCurrentUser().getUid();
+
+       AutomaticLoadImageAndNane();
+
+
+        //I put an onclick listener on the image
         circleImageView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -119,7 +110,98 @@ public class SetupAvtivity extends AppCompatActivity {
                 }
             }
         });
+
+        setupButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                UserName = EditTextForName.getText().toString();
+
+                if(!TextUtils.isEmpty(UserName)){
+                    progressbar.setVisibility(View.VISIBLE);
+                    if (isChanged) {
+                        storeImageInFirebaseStorage();
+                    }
+
+
+                   // fireStoreOperation(isChanged);
+                }else if(TextUtils.isEmpty(UserName)){
+                    Toast.makeText(SetupAvtivity.this, "Name can't be empty", Toast.LENGTH_SHORT).show();
+                }
+
+            }
+
+        });
     }
+
+    private void fireStoreOperation(boolean isChanged) {
+        Map<String,String> map = new HashMap<>();
+        map.put(nameKey,UserName);
+        if(isChanged){
+            map.put(imageKey,downloadUri.toString());
+        }
+        firebaseFirestore.collection("Users").document(user_id).set(map).addOnCompleteListener(new OnCompleteListener<Void>() {
+            @Override
+            public void onComplete(@NonNull Task<Void> task) {
+
+                Intent intent = new Intent(SetupAvtivity.this,Home.class);
+                startActivity(intent);
+                finish();
+            }
+        });
+
+    }
+
+
+    public void storeImageInFirebaseStorage(){
+
+        user_id = firebaseAuth.getCurrentUser().getUid();
+        final StorageReference image_path = storageReference.child("profile_Images").child(user_id + ".jpg");
+
+        UploadTask uploadTask = image_path.putFile(mainImageUri);
+        uploadTask.addOnSuccessListener(new OnSuccessListener<UploadTask.TaskSnapshot>() {
+            @Override
+            public void onSuccess(UploadTask.TaskSnapshot taskSnapshot) {
+                        Task<Uri> result = taskSnapshot.getMetadata().getReference().getDownloadUrl();
+                        result.addOnSuccessListener(new OnSuccessListener<Uri>() {
+                            @Override
+                            public void onSuccess(Uri uri) {
+                                downloadUri=uri;
+                                photoLink = downloadUri.toString();
+                            }
+                        });
+                        Toast.makeText(SetupAvtivity.this, photoLink, Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        progressbar.setVisibility(View.INVISIBLE);
+
+    }
+
+
+    private void AutomaticLoadImageAndNane() {
+        firebaseFirestore.collection(collectionName).document(user_id).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
+            @Override
+            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
+                if(task.isSuccessful()){
+
+                    if(task.getResult().exists()){
+                        String gottenname= task.getResult().getString(nameKey);
+                        String image = task.getResult().getString(imageKey);
+                        mainImageUri=Uri.parse(image);
+
+                        EditTextForName.setText(gottenname);
+                        RequestOptions placeholder = new RequestOptions();
+                        placeholder.placeholder(R.drawable.pp);
+                        Glide.with(SetupAvtivity.this).setDefaultRequestOptions(placeholder).load(image).into(circleImageView);
+                    }
+
+                }
+
+            }
+        });
+    }
+
+
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
@@ -130,6 +212,8 @@ public class SetupAvtivity extends AppCompatActivity {
             if (resultCode == RESULT_OK) {
                mainImageUri = result.getUri();
                circleImageView.setImageURI(mainImageUri);
+
+               isChanged=true;
 
             } else if (resultCode == CropImage.CROP_IMAGE_ACTIVITY_RESULT_ERROR_CODE) {
                 Exception error = result.getError();
